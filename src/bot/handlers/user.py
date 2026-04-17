@@ -30,21 +30,25 @@ async def chat_member_updated(update: ChatMemberUpdated, bot: Bot) -> None:
     if moderated_chat is None:
         logger.info("Chat %s is not configured for moderation", chat.id)
         return
+
     restriction_enabled = await restrict_newcomer(bot, chat.id, user.id)
     questionnaire = await create_pending_questionnaire(bot, chat.id, chat.title, user.id, moderated_chat.questions)
     greeting = build_group_greeting(user, moderated_chat.greetings_text)
+
     if restriction_enabled: greeting = f"{greeting}\n\nПисать в чате можно будет через {NEWCOMER_RESTRICTION_MINUTES} минут."
     thread_id = moderated_chat.newcomers_thread_id
     greeting_message = await send_chat_message(bot, chat.id, greeting, thread_id=thread_id, parse_mode=ParseMode.HTML)
     if questionnaire is None:
         logger.warning("No valid questions configured for chat %s", chat.id)
         return
+
     track_questionnaire_message(
         questionnaire.id,
         chat.id,
         greeting_message.message_id,
         user_mention_html=user.mention_html(),
     )
+
     if await start_questionnaire_delivery(
         bot,
         questionnaire.id,
@@ -54,6 +58,7 @@ async def chat_member_updated(update: ChatMemberUpdated, bot: Bot) -> None:
     ):
         schedule_questionnaire_cleanup(bot, questionnaire.id)
         return
+
     await send_chat_message(
         bot,
         chat.id,
@@ -70,21 +75,24 @@ async def start_private_questionnaire(message: Message, command: CommandObject |
         if await start_questionnaire_delivery(bot, questionnaire_id, message.chat.id, message.from_user.id, send_intro=True): return
         await message.answer("Не удалось запустить этот опрос. Возможно, он уже завершён.")
         return
+
     admin_chat_options = await list_user_record_chats_for_admin(bot, message.from_user.id)
     if admin_chat_options:
         await message.answer(
             "Выберите чат, чтобы получить CSV с ответами пользователей.",
             reply_markup=build_user_records_keyboard(admin_chat_options),
         )
+
     questionnaire = await get_latest_resumable_questionnaire(message.from_user.id)
-    if admin_chat_options and questionnaire is None:
-        return
+    if admin_chat_options and questionnaire is None: return
     if questionnaire is None:
         await message.answer("Я приветствую новых участников и провожу опросы. Добавь меня в чат и настрой вопросы в базе.")
         return
+
     if questionnaire.active_poll_id:
         await message.answer("Я уже отправил тебе текущий вопрос. Ответь на него, чтобы продолжить.")
         return
+
     if await start_questionnaire_delivery(bot, questionnaire.id, message.chat.id, message.from_user.id, send_intro=questionnaire.current_question_index == 0): return
     await message.answer("Пока не получилось продолжить опрос. Попробуй ещё раз чуть позже.")
 
@@ -98,18 +106,22 @@ async def export_user_records(callback: CallbackQuery, bot: Bot) -> None:
     if callback.from_user is None or callback.data is None or callback.message is None:
         await callback.answer()
         return
+
     chat_id = parse_user_records_callback(callback.data)
     if chat_id is None:
         await callback.answer("Не удалось определить чат.", show_alert=True)
         return
+
     if not await can_export_user_records(bot, callback.from_user.id, chat_id):
         await callback.answer("Эта выгрузка вам недоступна.", show_alert=True)
         return
+
     csv_bytes = await export_user_records_csv(chat_id)
     await callback.message.answer_document(
         BufferedInputFile(csv_bytes, filename=f"user_records_{abs(chat_id)}.csv"),
         caption="Выгрузка ответов пользователей.",
     )
+
     await callback.answer("Отправляю CSV.")
 
 
@@ -118,17 +130,20 @@ async def restart_questionnaire(callback: CallbackQuery, bot: Bot) -> None:
     if callback.from_user is None or callback.data is None or callback.message is None:
         await callback.answer()
         return
+
     raw_chat_id = callback.data.removeprefix(RESTART_CALLBACK_PREFIX)
-    try:
-        source_chat_id = int(raw_chat_id)
+    try: source_chat_id = int(raw_chat_id)
     except ValueError:
         await callback.answer("Не удалось перезапустить опрос.", show_alert=True)
         return
+
     questionnaire = await restart_questionnaire_for_user(bot, source_chat_id, callback.from_user.id)
     if questionnaire is None:
         await callback.answer("Опрос больше недоступен.", show_alert=True)
         return
+
     if await start_questionnaire_delivery(bot, questionnaire.id, callback.message.chat.id, callback.from_user.id, send_intro=True):
         await callback.answer("Запускаю опрос заново.")
         return
+
     await callback.answer("Не удалось начать опрос заново.", show_alert=True)

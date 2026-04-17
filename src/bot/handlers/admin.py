@@ -94,8 +94,7 @@ async def receive_greeting_text(message: Message, bot: Bot, state: FSMContext) -
         await state.set_state(ChatConfiguration.awaiting_questions_csv)
         await message.answer("Отправь CSV заново с исправленными вопросами.")
         return
-    try:
-        chat = await finalize_chat_configuration(bot, message.chat.id, greeting_text, questions)
+    try: chat = await finalize_chat_configuration(bot, message.chat.id, greeting_text, questions)
     except (TelegramBadRequest, TelegramForbiddenError) as error:
         logger.exception("Failed to finalize chat configuration for %s", message.chat.id)
         await message.answer(f"Не удалось завершить настройку: {error}. Проверь, что это supergroup с включёнными темами и у меня есть право управлять темами.")
