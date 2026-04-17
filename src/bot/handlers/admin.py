@@ -46,8 +46,13 @@ async def configure_chat(message: Message, bot: Bot, state: FSMContext) -> None:
         return
     await state.clear()
     await state.set_state(ChatConfiguration.awaiting_questions_csv)
-    await state.update_data(chat_id=message.chat.id, admin_id=message.from_user.id)
-    await send_questions_template(bot, message.chat.id, reconfigure=await is_chat_already_configured(message.chat.id))
+    await state.update_data(chat_id=message.chat.id, admin_id=message.from_user.id, thread_id=message.message_thread_id)
+    await send_questions_template(
+        bot,
+        message.chat.id,
+        reconfigure=await is_chat_already_configured(message.chat.id),
+        thread_id=message.message_thread_id,
+    )
 
 
 @admin_router.message(ChatConfiguration.awaiting_questions_csv, F.document)
@@ -55,6 +60,9 @@ async def receive_questions_csv(message: Message, bot: Bot, state: FSMContext) -
     if message.from_user is None or message.document is None: return
     data = await state.get_data()
     if data.get("chat_id") != message.chat.id or data.get("admin_id") != message.from_user.id: return
+    if data.get("thread_id") != message.message_thread_id:
+        await message.answer("Продолжай настройку в той же теме, где была запущена команда /configure.")
+        return
     try:
         raw_bytes = await read_uploaded_csv(bot, message.document)
         questions = parse_questions_csv(raw_bytes)
@@ -67,9 +75,14 @@ async def receive_questions_csv(message: Message, bot: Bot, state: FSMContext) -
         return
     await state.set_state(ChatConfiguration.awaiting_greeting_text)
     await state.update_data(questions=serialize_questions(questions))
+    thread_note = (
+        "После этого я сохраню вопросы, использую эту тему для новичков и включу сценарий модерации."
+        if data.get("thread_id") is not None
+        else f"После этого я создам тему «{NEWCOMERS_TOPIC_NAME}», сохраню вопросы и включу сценарий модерации."
+    )
     await message.answer(
         "Шаг 2/2. Теперь отправь приветственный текст для новичков. Можно с форматированием Telegram.\n\n"
-        f"После этого я создам тему «{NEWCOMERS_TOPIC_NAME}», сохраню вопросы и включу сценарий модерации."
+        + thread_note
     )
 
 
@@ -83,6 +96,9 @@ async def receive_greeting_text(message: Message, bot: Bot, state: FSMContext) -
     if message.from_user is None: return
     data = await state.get_data()
     if data.get("chat_id") != message.chat.id or data.get("admin_id") != message.from_user.id: return
+    if data.get("thread_id") != message.message_thread_id:
+        await message.answer("Продолжай настройку в той же теме, где была запущена команда /configure.")
+        return
     greeting_text = (message.html_text or "").strip()
     if not greeting_text:
         await message.answer("Приветственный текст не должен быть пустым.")
@@ -94,15 +110,26 @@ async def receive_greeting_text(message: Message, bot: Bot, state: FSMContext) -
         await state.set_state(ChatConfiguration.awaiting_questions_csv)
         await message.answer("Отправь CSV заново с исправленными вопросами.")
         return
-    try: chat = await finalize_chat_configuration(bot, message.chat.id, greeting_text, questions)
+    try: chat = await finalize_chat_configuration(
+        bot,
+        message.chat.id,
+        greeting_text,
+        questions,
+        newcomers_thread_id=data.get("thread_id"),
+    )
     except (TelegramBadRequest, TelegramForbiddenError) as error:
         logger.exception("Failed to finalize chat configuration for %s", message.chat.id)
         await message.answer(f"Не удалось завершить настройку: {error}. Проверь, что это supergroup с включёнными темами и у меня есть право управлять темами.")
         return
     await state.clear()
+    thread_summary = (
+        "Тема для новичков сохранена из текущей темы."
+        if data.get("thread_id") is not None
+        else f"Тема для новичков: «{NEWCOMERS_TOPIC_NAME}»."
+    )
     await message.answer(
         "Чат настроен.\n\n"
-        f"Тема для новичков: «{NEWCOMERS_TOPIC_NAME}».\n"
+        f"{thread_summary}\n"
         "Новые участники будут получать опрос, приветствие и ограничение на сообщения на 5 минут."
         + (f"\nID темы: {chat.newcomers_thread_id}" if chat.newcomers_thread_id is not None else "")
     )

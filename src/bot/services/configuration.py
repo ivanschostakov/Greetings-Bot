@@ -44,10 +44,10 @@ def describe_missing_permissions(member: ChatMemberAdministrator) -> list[str]:
     return missing
 
 
-async def send_questions_template(bot: Bot, chat_id: int, *, reconfigure: bool) -> None:
+async def send_questions_template(bot: Bot, chat_id: int, *, reconfigure: bool, thread_id: int | None = None) -> None:
     intro = "Переходим к настройке заново." if reconfigure else "Начинаем настройку чата."
-    await bot.send_message(chat_id, f"{intro}\n\nШаг 1/2. Заполни CSV-шаблон с вопросами и отправь его сюда обратно.")
-    await bot.send_document(chat_id, build_questions_template(), caption="Формат колонок: question, wrong1, wrong2, wrong3, right")
+    await bot.send_message(chat_id, f"{intro}\n\nШаг 1/2. Заполни CSV-шаблон с вопросами и отправь его сюда обратно.", message_thread_id=thread_id)
+    await bot.send_document(chat_id, build_questions_template(), caption="Формат колонок: question, wrong1, wrong2, wrong3, right", message_thread_id=thread_id)
 
 
 async def read_uploaded_csv(bot: Bot, document: Document) -> bytes:
@@ -65,10 +65,17 @@ async def is_user_chat_admin(bot: Bot, chat_id: int, user_id: int) -> bool:
     return member.status in {ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR}
 
 
-async def finalize_chat_configuration(bot: Bot, chat_id: int, greeting_text: str, questions: list[ImportedQuestion]) -> ModeratedChat:
+async def finalize_chat_configuration(
+    bot: Bot,
+    chat_id: int,
+    greeting_text: str,
+    questions: list[ImportedQuestion],
+    *,
+    newcomers_thread_id: int | None = None,
+) -> ModeratedChat:
     async with get_session() as session:
         chat = await session.get(ModeratedChat, chat_id)
-        thread_id = chat.newcomers_thread_id if chat is not None else None
+        thread_id = newcomers_thread_id if newcomers_thread_id is not None else (chat.newcomers_thread_id if chat is not None else None)
         if thread_id is None:
             topic = await bot.create_forum_topic(chat_id, NEWCOMERS_TOPIC_NAME)
             thread_id = topic.message_thread_id
