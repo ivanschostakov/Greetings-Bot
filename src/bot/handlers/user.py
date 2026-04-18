@@ -3,11 +3,11 @@ from logging import getLogger
 from aiogram import F, Bot, Router
 from aiogram.enums import ParseMode
 from aiogram.enums import ChatType
-from aiogram.filters import CommandObject, CommandStart, IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter, Command
+from aiogram.filters import CommandObject, CommandStart, IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter
 from aiogram.types import BufferedInputFile, CallbackQuery, ChatMemberUpdated, Message, PollAnswer
 
 from src.bot.helpers.configuration import NEWCOMER_RESTRICTION_MINUTES
-from src.bot.helpers.questionnaire import RESTART_CALLBACK_PREFIX, build_group_greeting, build_start_keyboard, parse_questionnaire_payload
+from src.bot.helpers.questionnaire import RESTART_CALLBACK_PREFIX, build_group_greeting, build_start_keyboard, build_user_mention_html, parse_questionnaire_payload
 from src.bot.helpers.user_records import USER_RECORDS_CALLBACK_PREFIX, build_user_records_keyboard, parse_user_records_callback
 from src.bot.services.configuration import restrict_newcomer, send_chat_message
 from src.bot.services.questionnaire import (
@@ -55,7 +55,7 @@ async def chat_member_updated(update: ChatMemberUpdated, bot: Bot) -> None:
         questionnaire.id,
         chat.id,
         start_message.message_id,
-        user_mention_html=user.mention_html(),
+        user_mention_html=build_user_mention_html(user),
     )
 
     schedule_questionnaire_cleanup(bot, questionnaire.id)
@@ -142,10 +142,3 @@ async def restart_questionnaire(callback: CallbackQuery, bot: Bot) -> None:
         return
 
     await callback.answer("Не удалось начать опрос заново.", show_alert=True)
-
-
-@user_router.message(F.chat.type == ChatType.PRIVATE, Command("test"))
-async def test_command(message: Message) -> None:
-    logger.info("test_command " + message.from_user.mention_html(""))
-    if message.from_user is None: return
-    await message.answer(message.from_user.mention_html("ㅤㅤㅤㅤㅤㅤ"), parse_mode=ParseMode.HTML)

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from src.bot.helpers.configuration import ImportedQuestion, validate_questions
 from src.bot.helpers.questionnaire import (
-    PreparedQuestion, build_feedback_message, build_group_completion_greeting, build_group_greeting,
+    MASKED_MENTION_TEXT, PreparedQuestion, build_feedback_message, build_group_completion_greeting, build_group_greeting,
     build_group_timeout_greeting, build_start_keyboard,
 )
 from src.bot.helpers.user_records import (
@@ -46,7 +46,7 @@ class ConfigurationValidationTests(unittest.TestCase):
 
         self.assertEqual(
             greeting,
-            'Добро пожаловать, <a href="tg://user?id=42">Alice &amp; Bob</a>!\n\n<i>Привет</i>',
+            f'Добро пожаловать, <a href="tg://user?id=42">{MASKED_MENTION_TEXT}</a>!\n\n<i>Привет</i>',
         )
 
     def test_build_group_completion_greeting_is_cute(self) -> None:
