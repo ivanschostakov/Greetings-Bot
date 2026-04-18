@@ -116,7 +116,14 @@ async def _questionnaire_cleanup_worker(bot: Bot, questionnaire_id: int) -> None
         await asyncio.sleep(TRACKED_MESSAGE_TTL.total_seconds())
         async with get_session() as session:
             questionnaire = await get_questionnaire_session(session, questionnaire_id)
-            if questionnaire is None or questionnaire.status in {"completed", "cancelled"} or not _is_group_delivery(questionnaire): return
+            if questionnaire is None or questionnaire.status in {"completed", "cancelled"}:
+                return
+            if questionnaire.status == "pending_start":
+                await delete_questionnaire_session(session, questionnaire)
+                await _delete_tracked_questionnaire_messages(bot, questionnaire_id)
+                return
+            if not _is_group_delivery(questionnaire):
+                return
             delivery_chat_id = questionnaire.delivery_chat_id
             delivery_thread_id = await _resolve_delivery_thread_id(session, questionnaire)
             await update_questionnaire_session(session=session, questionnaire=questionnaire, questionnaire_in=QuestionnaireSessionUpdate(status="cancelled", current_question_id=None, active_poll_id=None, active_poll_message_id=None))
@@ -141,6 +148,11 @@ async def _questionnaire_cleanup_worker(bot: Bot, questionnaire_id: int) -> None
 def schedule_questionnaire_cleanup(bot: Bot, questionnaire_id: int) -> None:
     _cancel_questionnaire_cleanup_task(questionnaire_id)
     _questionnaire_cleanup_tasks[questionnaire_id] = asyncio.create_task(_questionnaire_cleanup_worker(bot, questionnaire_id))
+
+
+async def consume_questionnaire_link(bot: Bot, questionnaire_id: int) -> None:
+    _cancel_questionnaire_cleanup_task(questionnaire_id)
+    await _delete_tracked_questionnaire_messages(bot, questionnaire_id)
 
 
 async def get_moderated_chat(chat_id: int) -> ModeratedChat | None:

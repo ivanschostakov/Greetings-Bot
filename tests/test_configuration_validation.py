@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from src.bot.helpers.configuration import ImportedQuestion, validate_questions
 from src.bot.helpers.questionnaire import (
     PreparedQuestion, build_feedback_message, build_group_completion_greeting, build_group_greeting,
-    build_group_timeout_greeting,
+    build_group_timeout_greeting, build_start_keyboard,
 )
 from src.bot.helpers.user_records import (
     UserRecordsChatOption, build_user_records_csv, build_user_records_keyboard, parse_user_records_callback,
@@ -60,6 +60,12 @@ class ConfigurationValidationTests(unittest.TestCase):
             build_group_timeout_greeting('<a href="tg://user?id=42">Alice</a>'),
             'Немного жаль, что вы не ответили на вопросы, <a href="tg://user?id=42">Alice</a>, но мы всё равно очень рады вам в чате!',
         )
+
+    def test_build_start_keyboard_uses_start_link_url(self) -> None:
+        keyboard = build_start_keyboard("https://t.me/testbot?start=questionnaire_10")
+
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Открыть бота")
+        self.assertEqual(keyboard.inline_keyboard[0][0].url, "https://t.me/testbot?start=questionnaire_10")
 
     def test_build_feedback_message_does_not_repeat_correctness(self) -> None:
         question = PreparedQuestion(

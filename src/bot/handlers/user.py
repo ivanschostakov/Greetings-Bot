@@ -7,13 +7,13 @@ from aiogram.filters import CommandObject, CommandStart, IS_MEMBER, IS_NOT_MEMBE
 from aiogram.types import BufferedInputFile, CallbackQuery, ChatMemberUpdated, Message, PollAnswer
 
 from src.bot.helpers.configuration import NEWCOMER_RESTRICTION_MINUTES
-from src.bot.helpers.questionnaire import RESTART_CALLBACK_PREFIX, build_group_greeting, parse_questionnaire_payload
+from src.bot.helpers.questionnaire import RESTART_CALLBACK_PREFIX, build_group_greeting, build_start_keyboard, parse_questionnaire_payload
 from src.bot.helpers.user_records import USER_RECORDS_CALLBACK_PREFIX, build_user_records_keyboard, parse_user_records_callback
 from src.bot.services.configuration import restrict_newcomer, send_chat_message
 from src.bot.services.questionnaire import (
-    create_pending_questionnaire, get_latest_resumable_questionnaire, get_moderated_chat, handle_poll_answer,
-    restart_questionnaire_for_user, schedule_questionnaire_cleanup, start_questionnaire_delivery,
-    track_questionnaire_message,
+    build_questionnaire_start_link, consume_questionnaire_link, create_pending_questionnaire,
+    get_latest_resumable_questionnaire, get_moderated_chat, handle_poll_answer, restart_questionnaire_for_user,
+    schedule_questionnaire_cleanup, start_questionnaire_delivery, track_questionnaire_message,
 )
 from src.bot.services.user_records import can_export_user_records, export_user_records_csv, list_user_record_chats_for_admin
 
@@ -42,29 +42,23 @@ async def chat_member_updated(update: ChatMemberUpdated, bot: Bot) -> None:
         logger.warning("No valid questions configured for chat %s", chat.id)
         return
 
+    start_link = await build_questionnaire_start_link(bot, questionnaire.id)
+    start_message = await send_chat_message(
+        bot,
+        chat.id,
+        "Чтобы пройти опрос, нажми кнопку ниже и ответь мне в личке.",
+        thread_id=thread_id,
+        reply_markup=build_start_keyboard(start_link),
+    )
+
     track_questionnaire_message(
         questionnaire.id,
         chat.id,
-        None,
+        start_message.message_id,
         user_mention_html=user.mention_html(),
     )
 
-    if await start_questionnaire_delivery(
-        bot,
-        questionnaire.id,
-        chat.id,
-        user.id,
-        send_intro=False,
-    ):
-        schedule_questionnaire_cleanup(bot, questionnaire.id)
-        return
-
-    await send_chat_message(
-        bot,
-        chat.id,
-        "Не удалось начать опрос в этой теме. При необходимости его можно продолжить в личных сообщениях через /start.",
-        thread_id=thread_id,
-    )
+    schedule_questionnaire_cleanup(bot, questionnaire.id)
 
 
 @user_router.message(F.chat.type == ChatType.PRIVATE, CommandStart())
@@ -72,6 +66,7 @@ async def start_private_questionnaire(message: Message, command: CommandObject |
     if message.from_user is None: return
     questionnaire_id = parse_questionnaire_payload(command.args if command else None)
     if questionnaire_id is not None:
+        await consume_questionnaire_link(bot, questionnaire_id)
         if await start_questionnaire_delivery(bot, questionnaire_id, message.chat.id, message.from_user.id, send_intro=True): return
         await message.answer("Не удалось запустить этот опрос. Возможно, он уже завершён.")
         return
