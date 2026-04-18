@@ -10,7 +10,6 @@ from aiogram.types import PollAnswer
 from aiogram.utils.deep_linking import create_start_link
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.bot.helpers.configuration import NEWCOMER_RESTRICTION_MINUTES
 from src.bot.helpers.questionnaire import build_completion_message, build_feedback_message, build_group_completion_greeting, build_group_timeout_greeting, build_private_intro, build_question_order, build_question_text, build_questionnaire_payload, build_restart_keyboard, prepare_question
 from src.database import get_session
 from src.database.crud import cancel_open_questionnaires_for_user_and_chat, complete_questionnaire_session, create_questionnaire_answer, create_questionnaire_session, create_user_record, delete_questionnaire_session, get_active_questionnaire_by_poll_id, get_chat_with_questions_and_answers, get_latest_resumable_questionnaire_for_user as get_latest_resumable_questionnaire_crud, get_question_with_answers, get_questionnaire_answer_for_session_and_question, get_questionnaire_session, get_questionnaire_session_for_user, list_open_questionnaires_for_user_and_chat, update_questionnaire_session
@@ -28,7 +27,7 @@ class TrackedQuestionnaireMessages:
     message_ids: set[int] = field(default_factory=set)
 
 
-TRACKED_MESSAGE_TTL = timedelta(minutes=NEWCOMER_RESTRICTION_MINUTES)
+TRACKED_MESSAGE_TTL = timedelta(hours=3)
 ENDING_MESSAGE_TTL = timedelta(seconds=30)
 _tracked_questionnaire_messages: dict[int, TrackedQuestionnaireMessages] = {}
 _questionnaire_cleanup_tasks: dict[int, asyncio.Task[None]] = {}

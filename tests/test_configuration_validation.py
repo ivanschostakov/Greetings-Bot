@@ -83,7 +83,10 @@ class ConfigurationValidationTests(unittest.TestCase):
         self.assertNotIn("Верно", feedback)
         self.assertNotIn("Неверно", feedback)
 
-    def test_track_questionnaire_message_expires_after_restriction_window(self) -> None:
+    def test_tracked_questionnaire_message_ttl_is_three_hours(self) -> None:
+        self.assertEqual(TRACKED_MESSAGE_TTL.total_seconds(), 3 * 60 * 60)
+
+    def test_track_questionnaire_message_expires_after_cleanup_window(self) -> None:
         now = datetime.now(UTC)
 
         self.assertTrue(track_questionnaire_message(10, -1001, 101, now=now))
