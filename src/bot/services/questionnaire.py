@@ -29,6 +29,7 @@ class TrackedQuestionnaireMessages:
 
 
 TRACKED_MESSAGE_TTL = timedelta(minutes=NEWCOMER_RESTRICTION_MINUTES)
+ENDING_MESSAGE_TTL = timedelta(seconds=30)
 _tracked_questionnaire_messages: dict[int, TrackedQuestionnaireMessages] = {}
 _questionnaire_cleanup_tasks: dict[int, asyncio.Task[None]] = {}
 
@@ -51,7 +52,14 @@ async def _resolve_delivery_thread_id(session: AsyncSession, questionnaire: Ques
     return chat.newcomers_thread_id
 
 
-def track_questionnaire_message(questionnaire_id: int, chat_id: int, message_id: int, *, now: datetime | None = None, user_mention_html: str | None = None) -> bool:
+def track_questionnaire_message(
+    questionnaire_id: int,
+    chat_id: int,
+    message_id: int | None,
+    *,
+    now: datetime | None = None,
+    user_mention_html: str | None = None,
+) -> bool:
     current_time = now or datetime.now(UTC)
     tracked = _tracked_questionnaire_messages.get(questionnaire_id)
     if tracked is None:
@@ -62,7 +70,8 @@ def track_questionnaire_message(questionnaire_id: int, chat_id: int, message_id:
         _tracked_questionnaire_messages.pop(questionnaire_id, None)
         return False
     if user_mention_html is not None: tracked.user_mention_html = user_mention_html
-    tracked.message_ids.add(message_id)
+    if message_id is not None:
+        tracked.message_ids.add(message_id)
     return True
 
 
@@ -90,6 +99,18 @@ def _cancel_questionnaire_cleanup_task(questionnaire_id: int) -> None:
     if task is not None and not task.done(): task.cancel()
 
 
+async def _delete_message_after_delay(bot: Bot, chat_id: int, message_id: int, delay: timedelta) -> None:
+    try:
+        await asyncio.sleep(delay.total_seconds())
+        await bot.delete_message(chat_id, message_id)
+    except (TelegramBadRequest, TelegramForbiddenError):
+        logger.debug("Unable to delete delayed message %s in chat %s", message_id, chat_id)
+
+
+def _schedule_ending_message_cleanup(bot: Bot, chat_id: int, message_id: int) -> None:
+    asyncio.create_task(_delete_message_after_delay(bot, chat_id, message_id, ENDING_MESSAGE_TTL))
+
+
 async def _questionnaire_cleanup_worker(bot: Bot, questionnaire_id: int) -> None:
     try:
         await asyncio.sleep(TRACKED_MESSAGE_TTL.total_seconds())
@@ -101,7 +122,13 @@ async def _questionnaire_cleanup_worker(bot: Bot, questionnaire_id: int) -> None
             await update_questionnaire_session(session=session, questionnaire=questionnaire, questionnaire_in=QuestionnaireSessionUpdate(status="cancelled", current_question_id=None, active_poll_id=None, active_poll_message_id=None))
         tracked = await _delete_tracked_questionnaire_messages(bot, questionnaire_id)
         if delivery_chat_id is None: return
-        await bot.send_message(delivery_chat_id, build_group_timeout_greeting(tracked.user_mention_html if tracked is not None else None), parse_mode=ParseMode.HTML, **_thread_kwargs(delivery_thread_id))
+        timeout_message = await bot.send_message(
+            delivery_chat_id,
+            build_group_timeout_greeting(tracked.user_mention_html if tracked is not None else None),
+            parse_mode=ParseMode.HTML,
+            **_thread_kwargs(delivery_thread_id),
+        )
+        _schedule_ending_message_cleanup(bot, delivery_chat_id, timeout_message.message_id)
         async with get_session() as session:
             questionnaire = await get_questionnaire_session(session, questionnaire_id)
             if questionnaire is not None: await delete_questionnaire_session(session, questionnaire)
@@ -176,7 +203,13 @@ async def _send_completion_message(bot: Bot, questionnaire_id: int, tracked: Tra
         if questionnaire.status != "completed": questionnaire = await complete_questionnaire_session(session, questionnaire)
         delivery_thread_id = await _resolve_delivery_thread_id(session, questionnaire)
         if _is_group_delivery(questionnaire):
-            await bot.send_message(questionnaire.delivery_chat_id, build_group_completion_greeting(tracked.user_mention_html if tracked is not None else None), parse_mode=ParseMode.HTML, **_thread_kwargs(delivery_thread_id))
+            completion_message = await bot.send_message(
+                questionnaire.delivery_chat_id,
+                build_group_completion_greeting(tracked.user_mention_html if tracked is not None else None),
+                parse_mode=ParseMode.HTML,
+                **_thread_kwargs(delivery_thread_id),
+            )
+            _schedule_ending_message_cleanup(bot, questionnaire.delivery_chat_id, completion_message.message_id)
             await delete_questionnaire_session(session, questionnaire)
             return
         await bot.send_message(questionnaire.delivery_chat_id, build_completion_message(questionnaire), reply_markup=_completion_reply_markup(questionnaire), **_thread_kwargs(delivery_thread_id))

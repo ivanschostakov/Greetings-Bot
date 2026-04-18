@@ -37,7 +37,7 @@ async def chat_member_updated(update: ChatMemberUpdated, bot: Bot) -> None:
 
     if restriction_enabled: greeting = f"{greeting}\n\nПисать в чате можно будет через {NEWCOMER_RESTRICTION_MINUTES} минут."
     thread_id = moderated_chat.newcomers_thread_id
-    greeting_message = await send_chat_message(bot, chat.id, greeting, thread_id=thread_id, parse_mode=ParseMode.HTML)
+    await send_chat_message(bot, chat.id, greeting, thread_id=thread_id, parse_mode=ParseMode.HTML)
     if questionnaire is None:
         logger.warning("No valid questions configured for chat %s", chat.id)
         return
@@ -45,7 +45,7 @@ async def chat_member_updated(update: ChatMemberUpdated, bot: Bot) -> None:
     track_questionnaire_message(
         questionnaire.id,
         chat.id,
-        greeting_message.message_id,
+        None,
         user_mention_html=user.mention_html(),
     )
 

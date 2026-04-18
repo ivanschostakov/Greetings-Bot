@@ -13,7 +13,7 @@ from src.bot.helpers.user_records import (
     UserRecordsChatOption, build_user_records_csv, build_user_records_keyboard, parse_user_records_callback,
 )
 from src.bot.services.questionnaire import (
-    TRACKED_MESSAGE_TTL, _build_poll_description, _completion_reply_markup, _thread_kwargs, _tracked_questionnaire_messages,
+    ENDING_MESSAGE_TTL, TRACKED_MESSAGE_TTL, _build_poll_description, _completion_reply_markup, _thread_kwargs, _tracked_questionnaire_messages,
     track_questionnaire_message,
 )
 
@@ -88,7 +88,7 @@ class ConfigurationValidationTests(unittest.TestCase):
         track_questionnaire_message(
             10,
             -1001,
-            101,
+            None,
             user_mention_html='<a href="tg://user?id=42">Alice</a>',
         )
 
@@ -97,9 +97,23 @@ class ConfigurationValidationTests(unittest.TestCase):
             'Для <a href="tg://user?id=42">Alice</a>',
         )
 
+    def test_track_questionnaire_message_can_store_only_mention_without_message_id(self) -> None:
+        self.assertTrue(
+            track_questionnaire_message(
+                10,
+                -1001,
+                None,
+                user_mention_html='<a href="tg://user?id=42">Alice</a>',
+            )
+        )
+        self.assertEqual(_tracked_questionnaire_messages[10].message_ids, set())
+
     def test_thread_kwargs_include_message_thread_id_only_when_present(self) -> None:
         self.assertEqual(_thread_kwargs(None), {})
         self.assertEqual(_thread_kwargs(777), {"message_thread_id": 777})
+
+    def test_ending_message_ttl_is_thirty_seconds(self) -> None:
+        self.assertEqual(ENDING_MESSAGE_TTL.total_seconds(), 30)
 
     def test_completion_reply_markup_is_hidden_for_group_delivery(self) -> None:
         group_session = SimpleNamespace(source_chat_id=-1001, delivery_chat_id=-1001)
