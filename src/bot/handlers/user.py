@@ -148,4 +148,4 @@ async def restart_questionnaire(callback: CallbackQuery, bot: Bot) -> None:
 async def test_command(message: Message) -> None:
     logger.info("test_command " + message.from_user.mention_html(""))
     if message.from_user is None: return
-    await message.answer(f'<i><b><a href="tg://user?id={message.from_user.id}" style="text-decoration:none;">ㅤㅤ</a></b></i>', parse_mode=ParseMode.HTML)
+    await message.answer(message.from_user.mention_html("ㅤㅤㅤㅤㅤㅤ"), parse_mode=ParseMode.HTML)
