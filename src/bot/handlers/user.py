@@ -3,7 +3,7 @@ from logging import getLogger
 from aiogram import F, Bot, Router
 from aiogram.enums import ParseMode
 from aiogram.enums import ChatType
-from aiogram.filters import CommandObject, CommandStart, IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter
+from aiogram.filters import CommandObject, CommandStart, IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter, Command
 from aiogram.types import BufferedInputFile, CallbackQuery, ChatMemberUpdated, Message, PollAnswer
 
 from src.bot.helpers.configuration import NEWCOMER_RESTRICTION_MINUTES
@@ -142,3 +142,10 @@ async def restart_questionnaire(callback: CallbackQuery, bot: Bot) -> None:
         return
 
     await callback.answer("Не удалось начать опрос заново.", show_alert=True)
+
+
+@user_router.callback_query(F.message.chat.type == ChatType.PRIVATE, Command("test"))
+async def test(message: Message) -> None:
+    print(message.from_user.mention_html())
+    await message.answer(f"{message.from_user.mention_html('')}")
+
