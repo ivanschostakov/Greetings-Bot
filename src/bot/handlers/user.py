@@ -146,6 +146,6 @@ async def restart_questionnaire(callback: CallbackQuery, bot: Bot) -> None:
 
 @user_router.message(F.chat.type == ChatType.PRIVATE, Command("test"))
 async def test_command(message: Message) -> None:
-    print("test_command", message.from_user.mention_html(""))
+    logger.info("test_command " + message.from_user.mention_html(""))
     if message.from_user is None: return
     await message.answer(message.from_user.mention_html(""), parse_mode=ParseMode.HTML)
