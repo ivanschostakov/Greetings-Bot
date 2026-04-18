@@ -8,7 +8,7 @@ from src.database.models import PollQuestion, QuestionnaireSession
 
 QUESTIONNAIRE_PAYLOAD_PREFIX = "questionnaire_"
 RESTART_CALLBACK_PREFIX = "restart:"
-MASKED_MENTION_TEXT = "ㅤㅤ"
+MASKED_MENTION_TEXT = "ㅤ"
 logger = getLogger(__name__)
 
 
