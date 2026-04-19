@@ -8,7 +8,7 @@ from src.database.models import PollQuestion, QuestionnaireSession
 
 QUESTIONNAIRE_PAYLOAD_PREFIX = "questionnaire_"
 RESTART_CALLBACK_PREFIX = "restart:"
-MASKED_MENTION_TEXT = "ㅤ"
+MASKED_MENTION_TEXT = "ㅤㅤ"
 logger = getLogger(__name__)
 
 
@@ -69,8 +69,8 @@ def build_question_order(chat_id: int, user_id: int, questions: list[PollQuestio
     return question_order, sum(prepared.is_scored for prepared in prepared_questions)
 
 
-def build_user_mention_html(user: User) -> str: return f'<a href="tg://user?id={user.id}">{MASKED_MENTION_TEXT}</a> <b>{user.full_name}</b>'
-def build_group_greeting(user: User, greetings_text: str) -> str: return f"Добро пожаловать,{build_user_mention_html(user)}!\n\n{greetings_text}"
+def build_user_mention_html(user: User) -> str: return f'<a href="tg://user?id={user.id}">{MASKED_MENTION_TEXT}</a>'
+def build_group_greeting(user: User, greetings_text: str) -> str: return f"Добро пожаловать, {build_user_mention_html(user)}!\n\n{greetings_text}"
 def build_group_completion_greeting(user_mention_html: str | None) -> str:
     if user_mention_html: return f"Спасибо, что ответили на все вопросы, {user_mention_html}. Очень рады вам в чате!"
     return "Спасибо, что ответили на все вопросы. Очень рады вам в чате!"

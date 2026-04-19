@@ -34,27 +34,32 @@ async def chat_member_updated(update: ChatMemberUpdated, bot: Bot) -> None:
     restriction_enabled = await restrict_newcomer(bot, chat.id, user.id)
     questionnaire = await create_pending_questionnaire(bot, chat.id, chat.title, user.id, moderated_chat.questions)
     greeting = build_group_greeting(user, moderated_chat.greetings_text)
+    reply_markup = None
 
     if restriction_enabled: greeting = f"{greeting}\n\nПисать в чате можно будет через {NEWCOMER_RESTRICTION_MINUTES} минут."
     thread_id = moderated_chat.newcomers_thread_id
-    await send_chat_message(bot, chat.id, greeting, thread_id=thread_id, parse_mode=ParseMode.HTML)
+    if questionnaire is not None:
+        start_link = await build_questionnaire_start_link(bot, questionnaire.id)
+        greeting = f"{greeting}\n\nЧтобы пройти опрос, нажми кнопку ниже и ответь мне в личке."
+        reply_markup = build_start_keyboard(start_link)
+
+    greeting_message = await send_chat_message(
+        bot,
+        chat.id,
+        greeting,
+        thread_id=thread_id,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML,
+    )
+
     if questionnaire is None:
         logger.warning("No valid questions configured for chat %s", chat.id)
         return
 
-    start_link = await build_questionnaire_start_link(bot, questionnaire.id)
-    start_message = await send_chat_message(
-        bot,
-        chat.id,
-        "Чтобы пройти опрос, нажми кнопку ниже и ответь мне в личке.",
-        thread_id=thread_id,
-        reply_markup=build_start_keyboard(start_link),
-    )
-
     track_questionnaire_message(
         questionnaire.id,
         chat.id,
-        start_message.message_id,
+        greeting_message.message_id,
         user_mention_html=build_user_mention_html(user),
     )
 
