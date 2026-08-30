@@ -46,7 +46,7 @@ class ConfigurationValidationTests(unittest.TestCase):
 
         self.assertEqual(
             greeting,
-            f'Добро пожаловать, <a href="tg://user?id=42">{MASKED_MENTION_TEXT}</a>!\n\n<i>Привет</i>',
+            f'Добро пожаловать, <a href="tg://user?id=42">{MASKED_MENTION_TEXT}</a><b>Alice &amp; Bob</b>!\n\n<i>Привет</i>',
         )
 
     def test_build_group_completion_greeting_is_cute(self) -> None:
