@@ -40,13 +40,13 @@ class ConfigurationValidationTests(unittest.TestCase):
             ["Вопрос 1: вариант ответа в колонке wrong2 длиннее 100 символов."],
         )
 
-    def test_build_group_greeting_uses_user_mention_html(self) -> None:
+    def test_build_group_greeting_escapes_name_without_mention(self) -> None:
         user = User(id=42, is_bot=False, first_name="Alice & Bob")
         greeting = build_group_greeting(user, "<i>Привет</i>")
 
         self.assertEqual(
             greeting,
-            f'Добро пожаловать, <a href="tg://user?id=42">{MASKED_MENTION_TEXT}</a><b>Alice &amp; Bob</b>!\n\n<i>Привет</i>',
+            'Добро пожаловать, Alice &amp; Bob!\n\n<i>Привет</i>',
         )
 
     def test_build_group_completion_greeting_is_cute(self) -> None:
